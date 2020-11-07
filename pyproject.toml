@@ -1,0 +1,21 @@
+[build-system]
+requires = ["flit_core >=2,<4"]
+build-backend = "flit_core.buildapi"
+
+[tool.flit.metadata]
+module = "vilolog"
+author = "Polydojo, Inc."
+author-email = "8079593+sumukhbarve@users.noreply.github.com"
+home-page = "https://github.com/polydojo/vilolog"
+classifiers = ["License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)"]
+description-file = "README.md"
+requires = [
+    "bcrypt >=3.2.0",
+    "dotsi >=0.0.1",
+    "Markdown >=3.3.3",
+    "pogodb >=0.0.2",
+    "psycopg2-binary >=2.8.6",
+    "python-dateutil >=2.8.1",
+    "qree >=0.0.2",
+    "vilo >=0.0.3",
+]

@@ -1,0 +1,6 @@
+*~
+*.pyc
+.DS_Store
+dist/
+*.py.env.json
+*_my.py
