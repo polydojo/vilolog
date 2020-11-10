@@ -40,9 +40,9 @@ import dotsi;
 import pogodb;
 import qree;
 
-__version__ = "0.0.1";  # Req'd by flit.
-userVersion = 0;
-pageVersion = 0;
+__version__ = "0.0.2-preview";  # Req'd by flit.
+USER_VERSION = 0;
+PAGE_VERSION = 0;
 
 genId = lambda n=1: "".join(map(lambda i: uuid.uuid4().hex, range(n)));
 getNow = lambda: int(time.time());  # Seconds since epoch.
@@ -121,6 +121,12 @@ LAYOUT = r"""
         
     </style>
     <title>{{: data.title :}}</title>
+    <script>
+        var getXCsrfToken = function () {
+            var ckMatch = document.cookie.match(/xCsrfToken\=\"(.+?)\"/);
+            return ckMatch ? ckMatch[1] : "";
+        };
+    </script>
 </head>
 <body>
 
@@ -167,6 +173,30 @@ ADMIN_LOGIN = """
 </form>
 """;
 
+ADMIN_RESET = r"""
+<h1>Danger Zone!</h1>
+<form id="resetForm" method="POST" class="hidden">
+    <input type="hidden" name="xCsrfToken">
+</form>
+<p>
+    To delete all the data, click the button below.<br>
+    <span class="pure-button" onclick="resetClickHandler('/_resetFull');">Reset All</span>
+</p>
+<p>
+    To delete all pages, click the button below.<br>
+    <span class="pure-button" onclick="resetClickHandler('/_resetPages');">Reset Pages</span>
+</p>
+<script>
+    var resetForm = document.getElementById("resetForm");
+    var resetClickHandler = function (actionTgt) {
+        if (! confirm("Are you sure?")) { return null; }
+        resetForm.xCsrfToken.value = getXCsrfToken();
+        resetForm.setAttribute("action", actionTgt);
+        resetForm.submit();
+    };
+</script>
+""";
+
 # ----------------------------------------------------------
 
 ADMIN_PAGE_LISTER = """
@@ -200,7 +230,7 @@ ADMIN_PAGE_LISTER = """
             </li>
         @}
     </ul>
-    <form id="delForm" class="hidden" method="POST" action="/_deletePage" target="_blank">
+    <form id="delForm" class="hidden" method="POST" action="/_deletePage" data-not-target="_blank">
         <input name="pageId" value=""><br><br>
         <input name="xCsrfToken"><br><br>
         <button>Submit</button>
@@ -208,17 +238,16 @@ ADMIN_PAGE_LISTER = """
     <script>
         var delForm = document.getElementById("delForm");
         var delPage = function (pageId) {
-            var ckMatch = null, liEl;
+            var pageElm = null;
             if (! confirm("Confirm?")) {
                 return null;    // Short ckt.
             }
             // otherwise ...
             delForm.pageId.value = pageId;
-            ckMatch = document.cookie.match(/xCsrfToken\=\"(.+?)\"/);
-            delForm.xCsrfToken.value = ckMatch ? ckMatch[1] : "";
+            delForm.xCsrfToken.value = getXCsrfToken();
             delForm.submit();
-            liEl = document.getElementById("page_id_" + pageId);
-            liEl.innerHTML = "[DELETING ...]";
+            pageElm = document.getElementById("page_id_" + pageId);
+            pageElm.innerHTML = "[DELETING ... ]";
         };
     </script>
 @}
@@ -264,7 +293,7 @@ ADMIN_PAGE_EDITOR = r"""
         return false;
     };
     var submitHandler = function () {
-        var meta = null, ckMatch;
+        var meta = null;
         try {
             meta = JSON.parse(pageForm.meta.value);
         } catch (e) {
@@ -291,8 +320,7 @@ ADMIN_PAGE_EDITOR = r"""
         if (typeof(meta.isDraft) !== "boolean") {
             return alertErr("Invalid/missing meta.isDraft.");
         }
-        ckMatch = document.cookie.match(/xCsrfToken\=\"(.+?)\"/);
-        pageForm.xCsrfToken.value = ckMatch ? ckMatch[1] : "";
+        pageForm.xCsrfToken.value = getXCsrfToken();
         return true;
     };
     pageForm.onsubmit = submitHandler;  // Alias.
@@ -368,8 +396,7 @@ ADMIN_USER_EDITOR = r"""
 <script>
     var form = document.getElementById("userForm");
     form.onsubmit = function () {
-        var ckMatch = document.cookie.match(/xCsrfToken\=\"(.+?)\"/);
-        form.xCsrfToken.value = ckMatch ? ckMatch[1] : "";
+        form.xCsrfToken.value = getXCsrfToken();
         return true;
     };
 </script>
@@ -402,8 +429,9 @@ DEFAULT_HOME = (DEFAULT_HEADER + """
 @=# data: {req, res, pageList, blogTitle}
 @= if not data.pageList:
 @{
-        <br><br><br>
+        <br><br>
         <p>Nothing here, yet.</p>
+        <br><br>
 @}
 
 @= for page in data.pageList:
@@ -424,6 +452,17 @@ DEFAULT_PAGE = (DEFAULT_HEADER + """
 <div class="main">
 {{= markdown.markdown(data.currentPage.body, extensions=['fenced_code']) =}}
 </div>
+<br>
+<div>
+    @= if data.nextPage:
+    @{
+        <div>Next: <a href="/{{: data.nextPage.meta.slug :}}">{{: data.nextPage.meta.title :}}</a></div>
+    @}
+    @= if data.prevPage:
+    @{
+        <div>Previous: <a href="/{{: data.prevPage.meta.slug :}}">{{: data.prevPage.meta.title :}}</a></div>
+    @}
+</div>
 """ + DEFAULT_FOOTER);
 
 # ----------------------------------------------------------
@@ -442,6 +481,136 @@ DEFAULT_404 = (DEFAULT_HEADER + """
 </p>
 """ + DEFAULT_FOOTER);
 
+############################################################
+# User Model: ##############################################
+############################################################
+
+def validateUser (user):
+    assert type(user) in [dict, dotsi.Dict];
+    user = dotsi.fy(user);
+    assert user._id and type(user._id) is str;
+    assert user.version == USER_VERSION;
+    assert user.type == "user";
+    assert user.name and type(user.name) is str;
+    assert user.email and type(user.email) is str;
+    assert re.match(r"^\S+@\S+\.\S+$", user.email);
+    assert user.hpw and type(user.hpw) is str;
+    assert user.createdAt and type(user.createdAt) is int;
+    assert user.role in ["admin", "author", "deactivated"];
+    return True;
+
+def buildUser (name, email, password, role):
+    user = dotsi.fy({
+        "_id": genId(),
+        "version": USER_VERSION,
+        "type": "user",
+        "name": name,
+        "email": email,
+        "hpw": hashPw(password),
+        "createdAt": getNow(),
+        "role": role,
+    });
+    assert validateUser(user);
+    return user;
+
+def adaptUser (db, user):
+    assert user.version == USER_VERSION;
+    return user;
+
+def getUser (db, subdoc):
+    if type(subdoc) is str:
+        subdoc = {"_id": subdoc};
+    user.update({"type": "user"});
+    user = db.findOne(subdoc);
+    if not user: return None;
+    return adaptUser(db, version);
+
+def getUserList (db, subdoc):
+    subdoc.update({"type": "user"});
+    userList = db.find(subdoc);
+    return mapli(userList, lambda user: adaptPage(db, user));
+
+############################################################
+# Page Model: ##############################################
+############################################################
+
+def validatePage (page):
+    "Validates `page` schema.";
+    assert type(page) in [dict, dotsi.Dict];
+    page = dotsi.fy(page);
+    assert page._id and type(page._id) is str;
+    assert page.version == PAGE_VERSION;
+    assert page.type == "page";
+    # Meta Starts:
+    assert type(page.meta) == dotsi.Dict;
+    meta = page.meta;
+    assert meta.title and type(meta.title) is str;
+    assert meta.slug and type(meta.slug) is str;
+    assert re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]+$", meta.slug);
+    assert meta.isoDate and type(meta.isoDate) is str;
+    assert re.match(r"^\d\d\d\d-\d\d-\d\d$", meta.isoDate);
+    assert meta.template and type(meta.template) is str;
+    assert meta.template.endswith(".html");
+    assert type(meta.isDraft) is bool;
+    # Meta Ends;
+    assert page.body and type(page.body) is str;
+    assert page.authorId and type(page.authorId) is str;
+    assert page.createdAt and type(page.createdAt) is int;
+    return True;
+
+def buildPage (meta, body, author, _id=None):
+    page = dotsi.fy({
+        "_id": _id or genId(),
+        "version": PAGE_VERSION,
+        "type": "page",
+        "meta": meta,
+        "body": body,
+        "authorId": author._id,
+        "createdAt": getNow(),
+    });
+    assert validatePage(page);
+    return page;
+
+def adaptPage (db, page):
+    assert page.version == PAGE_VERSION;
+    return page;
+
+def getPage (db, subdoc):
+    if type(subdoc) is str:
+        subdoc = {"_id": subdoc};
+    subdoc.update({"type": "page"});
+    page = db.findOne(subdoc);
+    if not page: return None;
+    return adaptPage(db, page);
+
+def getNextAndPrevPages (db, page):
+    subdoc = {"meta": {"template": page.meta.template}};
+    nextPage = db.findOne(subdoc, whereEtc="""
+        AND doc->'meta'->>'isoDate' > %s
+        ORDER BY doc->'meta'->>'isoDate' ASC
+    """, argsEtc=[page.meta.isoDate]);
+    prevPage = db.findOne(subdoc, whereEtc="""
+        AND doc->'meta'->>'isoDate' < %s
+        ORDER BY doc->'meta'->>'isoDate' DESC
+    """, argsEtc=[page.meta.isoDate]);
+    if nextPage:
+        nextPage = adaptPage(db, nextPage);
+    if prevPage:
+        prevPage = adaptPage(db, prevPage);
+    return [nextPage, prevPage];
+
+def getPageList (db, subdoc):
+    subdoc.update({"type": "page"});
+    pageList = db.find(subdoc);
+    pageList = mapli(pageList, lambda p: adaptPage(db, p));
+    pageList.sort(key=lambda p: p.meta.isoDate, reverse=True);
+    return pageList;
+
+def getAllPages_inclDrafts (db):
+    return getPageList(db, {});
+def getAllPages_exclDrafts (db):
+    return getPageList(db, {"meta": {"isDraft": False}});
+
 
 ############################################################
 # Build: ###################################################
@@ -459,6 +628,24 @@ def buildApp (
     app = vilo.buildApp();
     wsgi = app.wsgi;
     dbful = pogodb.makeConnector(pgUrl);
+    
+    ########################################################
+    # Templating Helpers: ##################################
+    ########################################################
+    
+    def validateThemeDir ():
+        if themeDir is None:
+            return True;
+        if not os.path.isdir(themeDir):
+            raise ValueError("No such directory: %s" % themeDir);
+        themeSlash = lambda x: os.path.join(themeDir, x);
+        for fname in ["home.html", "page.html", "404.html"]:
+            if not os.path.isfile(themeSlash(fname)):
+                raise ValueError("Theme doesn't include file: %s" % fname);
+        if not os.path.isdir(themeSlash("static")):
+            raise ValueError("Theme doesn't include directory: static/");
+        return True;
+    validateThemeDir(); # Called immediately.
 
     def defaultTpl (innerTpl, data=None):
         data = dotsi.defaults(dotsi.fy({}), data or {}, {
@@ -472,7 +659,7 @@ def buildApp (
             "title": data.title, "bodyHtml": bodyHtml,
         }));
 
-    def oneline (sentence):
+    def oneLine (sentence):
         spPaths = re.findall(r"\s/_\w+", sentence);
         # ^ Pattern: <space> <slash> <underscore> <onePlusWordChars>
         for spPath in spPaths:
@@ -487,6 +674,9 @@ def buildApp (
             "bodyHtml": sentence,
         }));
     
+    def errLine (sentence):
+        return vilo.error(oneLine(sentence));
+    
     def customTpl (filename, req, res, data=None):
         data = dotsi.defaults(dotsi.fy({}), data or {}, {
             "blogTitle": blogTitle,
@@ -494,7 +684,10 @@ def buildApp (
             "req": req, "res": res,
         });
         path = os.path.join(themeDir, filename);
-        return qree.renderPath(path, data=data);
+        try:
+            return qree.renderPath(path, data=data);
+        except IOError as e:
+            raise errLine("ERROR: TEMPLATE NOT FOUND");
     
     def autoTpl (filename, innerTpl, req, res, data=None):
         if not themeDir:
@@ -518,24 +711,24 @@ def buildApp (
         res.setCookie("xCsrfToken", "");
 
     def getCurrentUser (db, req):
-        errLine = "Session expired. Please /_logout and then /_login again.";
+        errMsg = "Session expired. Please /_logout and then /_login again.";
         userId = req.getCookie("userId", cookieSecret);
         #print("userId =", userId);
         if not userId:
-            raise vilo.error(oneline(errLine));
+            raise errLine(errMsg);
         if req.getVerb() != "GET":
             xCsrfToken = req.fdata.get("xCsrfToken") or "";
             xUserId = vilo.signUnwrap(xCsrfToken, antiCsrfSecret);
             #print("repr xUserId = ", repr(xUserId));
             if userId != xUserId:
-                raise vilo.error(oneline("CSRF invalid. " + errLine));
+                raise errLine("CSRF invalid. " + errMsg);
         # otherwise ...
         user = db.findOne(userId);
         #print("user =", user);
         if not (user and user.type == "user"):
-            raise vilo.error(oneline(errLine));
+            raise errLine(errMsg);
         if user.role == "deactivated":
-            raise vilo.error(oneline("Access deactivated."));
+            raise errLine("Access deactivated.");
         return user;
 
     def authful (oFunc):
@@ -551,9 +744,9 @@ def buildApp (
             return True;
         if user.role == "author" and user._id == page.authorId:
             return True;
-        raise vilo.error(oneline("""Access denied.
+        raise errLine("""Access denied.
             Only admins and authors can edit/delete pages.
-        """));
+        """);
         
 
     ########################################################
@@ -562,78 +755,49 @@ def buildApp (
 
     @app.route("GET", "/_hello")
     def get_hello (req, res):
-        return oneline("Hello, I'm the /_hello route! Try: /_setup");
+        return oneLine("Hello, I'm the /_hello route! Try: /_setup");
     
     @app.route("GET", "/_setup")
     @dbful
     def get_setup (req, res, db):
         anyUser = db.findOne({"type": "user"});
         if anyUser:
-            return oneline("Setup previously completed. Visit: /_login");
+            raise errLine("Setup previously completed. Visit: /_login");
         return defaultTpl(ADMIN_SETUP);
-
-    def validateUser (user):
-        assert type(user) in [dict, dotsi.Dict];
-        user = dotsi.fy(user);
-        assert user._id and type(user._id) is str;
-        assert type(user.version) is int;
-        assert user.type == "user";
-        assert user.name and type(user.name) is str;
-        assert user.email and type(user.email) is str;
-        assert re.match(r"^\S+@\S+\.\S+$", user.email);
-        assert user.hpw and type(user.hpw) is str;
-        assert user.createdAt and type(user.createdAt) is int;
-        assert user.role in ["admin", "author", "deactivated"];
-        return True;
-    
-    def buildUser (name, email, password, role):
-        user = dotsi.fy({
-            "_id": genId(),
-            "version": userVersion,
-            "type": "user",
-            "name": name,
-            "email": email,
-            "hpw": hashPw(password),
-            "createdAt": getNow(),
-            "role": role,
-        });
-        assert validateUser(user);
-        return user;
 
     @app.route("POST", "/_setup")
     @dbful
     def post_setup (req, res, db):
         anyUser = db.findOne({"type": "user"});
         if anyUser:
-            return oneline("Setup previously completed. Visit: /_login");
+            raise errLine("Setup previously completed. Visit: /_login");
         d = req.fdata;
         user = buildUser(d.name, d.email, d.password, role="admin");
         db.insertOne(user);
-        return oneline("Done! Setup complete. Proceed to: /_login");
-
-
-    @app.route("GET", "/_resetAll")
+        return oneLine("Done! Setup complete. Proceed to: /_login");
+    
+    @app.route("GET", "/_reset")
     @authful
     def get_reset (req, res, user, db):
         assert user.role == "admin";
-        sure = req.qdata.get("sure") or "no";
-        if sure != "True":
-            return oneline("Aborted. Pass ?sure=True if you're really sure.");
+        return defaultTpl(ADMIN_RESET);
+
+    @app.route("POST", "/_resetFull")
+    @authful
+    def get_reset (req, res, user, db):
+        assert user.role == "admin";
         db.clearTable(sure=True);
-        return oneline("Done! Proceed to: /_setup");
+        return oneLine("Done! Proceed to: /_setup");
 
-    @app.route("GET", "/_resetPages")
+    @app.route("POST", "/_resetPages")
     @authful
     def get_reset (req, res, user, db):
         assert user.role == "admin";
-        sure = req.qdata.get("sure") or "no";
-        if sure != "True":
-            return oneline("Aborted. Pass ?sure=True if you're really sure.");
-        pageList = getPageList(db, inclDrafts=True);
+        pageList = getAllPages_inclDrafts(db);
         for page in pageList:
             db.deleteOne(page._id);
-        return oneline(vilo.escfmt(
-            "Done! Deleted %s pages. See: /pages", len(pageList),
+        return oneLine(vilo.escfmt(
+            "Done! Deleted %s pages. See: /_pages", len(pageList),
         ));
 
     ########################################################
@@ -650,35 +814,28 @@ def buildApp (
         d = req.fdata;
         user = db.findOne({"type": "user", "email": d.email});
         if not user:
-            return oneline("Email not recognized.");
+            raise errLine("Email not recognized.");
         if not checkPw(d.password, user.hpw):
-            return oneline("Email/password mismatch.");
+            raise errLine("Email/password mismatch.");
         if user.role == "deactivated":
-            return oneline("Access deactivated.");
+            raise errLine("Access deactivated.");
         startLoginSession(user, res);
-        return oneline("Done! Proceed to: /_pages");
+        #return oneLine("Done! Proceed to: /_pages");
+        return res.redirect("/_pages");
 
     @app.route("GET", "/_logout")
     def get_logout (req, res):
         clearLoginSession(res);
-        return oneline("You've logged out. Visit /_login to log back in.");
+        return oneLine("You've logged out. Visit /_login to log back in.");
 
     ########################################################
     # Page Management: #####################################
     ########################################################
     
-    def getPageList (db, inclDrafts):
-        assert type(inclDrafts) is bool;
-        # TODO: Some sort of caching.
-        if inclDrafts:
-            return db.find({"type": "page"});
-        # otherwise ...
-        return db.find({"type": "page", "meta": {"isDraft": False}});
-    
     @app.route("GET", "/_pages")
     @authful
     def get_pages (req, res, db, user):
-        pageList = getPageList(db, inclDrafts=True);
+        pageList = getAllPages_inclDrafts(db);
         return defaultTpl(ADMIN_PAGE_LISTER, data={
             "pageList": pageList,
         });
@@ -686,66 +843,36 @@ def buildApp (
     @app.route("GET", "/_newPage")
     @authful
     def get_newPage (req, res, db, user):
+        assert user.role in ["author", "admin"];
         return defaultTpl(ADMIN_PAGE_EDITOR);
-
-    def validatePage (page):
-        "Validates `page` schema.";
-        assert type(page) in [dict, dotsi.Dict];
-        page = dotsi.fy(page);
-        assert page._id and type(page._id) is str;
-        assert type(page.version) is int;
-        assert page.type == "page";
-        # Meta Starts:
-        assert type(page.meta) == dotsi.Dict;
-        meta = page.meta;
-        assert meta.title and type(meta.title) is str;
-        assert meta.slug and type(meta.slug) is str;
-        assert re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]+$", meta.slug);
-        assert meta.isoDate and type(meta.isoDate) is str;
-        assert re.match(r"^\d\d\d\d-\d\d-\d\d$", meta.isoDate);
-        assert meta.template and type(meta.template) is str;
-        assert meta.template.endswith(".html");
-        assert type(meta.isDraft) is bool;
-        # Meta Ends;
-        assert page.body and type(page.body) is str;
-        assert page.authorId and type(page.authorId) is str;
-        assert page.createdAt and type(page.createdAt) is int;
-        return True;
-    
-    def buildPage (meta, body, author, _id=None):
-        page = dotsi.fy({
-            "_id": _id or genId(),
-            "version": pageVersion,
-            "type": "page",
-            "meta": meta,
-            "body": body,
-            "authorId": author._id,
-            "createdAt": getNow(),
-        });
-        assert validatePage(page);
-        return page;
 
     @app.route("POST", "/_newPage")
     @authful
     def post_newPage (req, res, db, user):
-        d = req.fdata;
-        assert d.body and d.meta;
-        meta = dotsi.fy(json.loads(d.meta));
-        #pprint.pprint(d);
-        page = buildPage(meta=meta, body=d.body, author=user);
+        assert user.role in ["author", "admin"];
+        assert req.fdata.body and req.fdata.meta;
+        meta = dotsi.fy(json.loads(req.fdata.meta));
+        sameSlugPage = getPage(db, {"meta": {"slug": meta.slug}});
+        if sameSlugPage:
+            raise errLine("Slug already taken. Try another?");
+        #pprint.pprint(f);
+        page = buildPage(meta, req.fdata.body, author=user);
         #pprint.pprint(page);
         db.insertOne(page);
-        return oneline(vilo.escfmt(
-            "Done! <a href='/%s'>View page</a> or proceed to: /_pages", page.meta.slug,
+        return oneLine(vilo.escfmt("""Done!
+            <a href='/%s'>View page</a>,
+            <a href='/_editPage/%s'>edit it</a>,
+             or proceed to: /_pages""", [
+                page.meta.slug, page._id,
+            ],
         ));
 
     @app.route("GET", "/_editPage/*")
     @authful
     def get_edit_byId (req, res, db, user):
         pageId = req.wildcards[0];
-        page = db.findOne(pageId);
-        if not (page and page.type == "page"):
-            raise vilo.error(oneline("No such page."));
+        page = getPage(db, pageId);
+        if not page: raise errLine("No such page.");
         assert validatePageEditDelRole(user, page);
         return defaultTpl(ADMIN_PAGE_EDITOR, data={
             "page": page,
@@ -755,17 +882,23 @@ def buildApp (
     @authful
     def post_edit_byId (req, res, db, user):
         pageId = req.wildcards[0];
-        page = db.findOne(pageId);
-        if not (page and page.type == "page"):
-            raise vilo.error(oneline("No such page."));
+        page = getPage(db, pageId);
+        if not page: raise errLine("No such page.");
+        oldSlug = page.meta.slug;
         assert validatePageEditDelRole(user, page);
-        d = req.fdata;
-        meta = dotsi.fy(json.loads(d.meta));
-        page.update({"meta": meta, "body": d.body});
+        meta = dotsi.fy(json.loads(req.fdata.meta));
+        newSlug = meta.slug;
+        if oldSlug != newSlug:
+            sameSlugPage = getPage(db, {"meta": {"slug": newSlug}});
+            if sameSlugPage:
+                raise errLine("Slug already taken. Try another?");
+        page.update({"meta": meta, "body": req.fdata.body});
         assert validatePage(page);
         db.replaceOne(page);
-        return oneline(vilo.escfmt(
-            "Done! <a href='/%s'>View page,</a> <a href=''>re-edit it</a>, or proceed to: /_pages", meta.slug,
+        return oneLine(vilo.escfmt("""Done!
+            <a href='/%s'>View page,</a>
+            <a href=''>re-edit it</a>,
+            or proceed to: /_pages""", meta.slug,
         ));
 
     @app.route("POST", "/_previewPage/")                    # Very similar to the publicly-accessible "/*" route.
@@ -773,21 +906,17 @@ def buildApp (
     @authful
     def post_pagePreview (req, res, db, user):
         pageId = req.wildcards[0] if req.wildcards else None;
-        pageList = getPageList(db, inclDrafts=True);
-        cPgList = filterli(pageList, lambda p: p._id == pageId);
-        assert len(cPgList) <= 1;
-        f = req.fdata;
-        meta = dotsi.fy(json.loads(f.meta));
-        currentPage = cPgList[0] if cPgList else buildPage(
-            meta=meta, body=f.body, author=user,
-        );
-        currentPage.update({"meta": meta, "body": f.body});
-        return autoTpl(currentPage.meta.template or "page.html",
-            DEFAULT_PAGE, req, res, data={
-                "pageList": pageList,
+        currentPage = getPage(db, pageId);
+        meta = dotsi.fy(json.loads(req.fdata.meta));
+        currentPage.update({"meta": meta, "body": req.fdata.body});
+        nextPage, prevPage = getNextAndPrevPages(db, currentPage);
+        return autoTpl(
+            currentPage.meta.template, DEFAULT_PAGE, req, res, data={
                 "currentPage": currentPage,
                 "title": currentPage.meta.title + " // " + blogTitle,
                 "isPreview": True,
+                "nextPage": nextPage,
+                "prevPage": prevPage,
             },
         );
     
@@ -795,21 +924,11 @@ def buildApp (
     @authful
     def post_deletePage (req, res, db, user):
         pageId = req.fdata.pageId;
-        page = db.findOne(pageId);
-        if not (page and page.type == "page"):
-            raise vilo.error(oneline("No such page."));
-        # otherwise ...
+        page = getPage(db, pageId);
+        if not page: raise errLine("No such page.");
         assert validatePageEditDelRole(user, page);
         db.deleteOne(page._id);
-        return oneline(vilo.escfmt("""Page deleted.
-            <a href="javascript:window.close();">Close window</a>
-            or proceed to: /_pages
-            <script>
-                var oDoc = window.opener.document;
-                var oElm = oDoc.getElementById("page_id_%s");
-                oElm.innerHTML = "[DELETED]";
-            </script>
-        """, page._id));
+        return res.redirect("/_pages");
 
     ########################################################
     # User Management: #####################################
@@ -829,7 +948,7 @@ def buildApp (
         currentUser = user;
         del user;
         if currentUser.role != "admin":
-            return oneline("Access denied. Only admins can add users.");
+            raise errLine("Access denied. Only admins can add users.");
         # otherwise ...
         return defaultTpl(ADMIN_USER_EDITOR);
 
@@ -848,7 +967,7 @@ def buildApp (
         # otherwise ...
         newUser = buildUser(d.name, d.email, d.password, d.role);
         db.insertOne(newUser);
-        return oneline("Done! New user created. Visit: /_users");
+        return res.redirect("/_users");
 
     @app.route("GET", "/_editUser/*")
     @authful
@@ -857,7 +976,7 @@ def buildApp (
         currentUser = user;
         del user;
         if currentUser.role != "admin":
-            return oneline("Access denied. Only admins can edit users.");
+            raise errLine("Access denied. Only admins can edit users.");
         # otherwise ...
         thatUser = db.findOne(thatUserId);
         assert thatUser and thatUser.type == "user";
@@ -872,11 +991,11 @@ def buildApp (
         currentUser = user;
         del user;
         if currentUser.role != "admin":
-            return oneline("Access denied. Only admins can edit users.");
+            raise errLine("Access denied. Only admins can edit users.");
         # otherwise ...
         thatUser = db.findOne(thatUserId);
         if not (thatUser and thatUser.type == "user"):
-            return oneline("No such user. See: /_users");
+            raise errLine("No such user. See: /_users");
         # otherwise ...
         f = req.fdata;
         thatUser.update({"name": f.name, "role": f.role});  # TODO: Allow email update?
@@ -884,16 +1003,46 @@ def buildApp (
             thatUser.update({"hpw": hashPw(f.password)});
         assert validateUser(thatUser);
         db.replaceOne(thatUser);
-        return oneline("Done! User upated. See: /_users");
+        return res.redirect("/_users");
+
+
+    ########################################################
+    # Caching Helpers: #####################################
+    ########################################################
+
+    pathCache = dotsi.fy({});
+    def pathCacheful (fn):
+        "Decorator for auto-caching reposne by path.";
+        @functools.wraps(fn)
+        def wrapper (req, res, *a, **ka):
+            path = req.getPathInfo();
+            if path not in pathCache:
+                print("Caching ...");
+                pathCache[path] = fn(req, res, *a, **ka);
+            else: print("Already cached!");
+            return pathCache[path];
+        return wrapper;
+    
+    def plugin_clearPathCacheOnPost (fn):
+        "Plugin for auto-clearing cache on every POST request.";
+        @functools.wraps(fn)
+        def wrapper (req, res, *a, **ka):
+            if req.getVerb() == "POST":
+                pathCache.clear();
+                print("Cache cleared.");
+            return fn(req, res, *a, **ka);
+        return wrapper;
+    app.install(plugin_clearPathCacheOnPost);
 
     ########################################################
     # Serving Content: #####################################
     ########################################################
 
     @app.route("GET", "/")
+    @pathCacheful
     @dbful
     def get_homepage (req, res, db):
-        pageList = getPageList(db, inclDrafts=False);
+        pageList = getAllPages_exclDrafts(db);
         return autoTpl("home.html", DEFAULT_HOME, req, res, data={
             "pageList": pageList,
         });
@@ -905,9 +1054,10 @@ def buildApp (
     #    return "";
 
     @app.route("GET", "/sitemap.txt")
+    @pathCacheful
     @dbful
     def get_sitemapTxt (req, res, db):
-        pageList = getPageList(db, inclDrafts=False);
+        pageList = getAllPages_exclDrafts(db);
         schHost = req.splitUrl.scheme + "://" + req.splitUrl.netloc;
         # ^ Scheme w/ netloc. (Netloc includes port.)
         pageUrlList = mapli(pageList, lambda p: schHost + "/" + p.meta.slug);
@@ -915,42 +1065,41 @@ def buildApp (
         return "\n".join(pageUrlList);
     
     @app.route("GET", "/*")
+    @pathCacheful
     @dbful
     def get_pageBySlug (req, res, db):
         slug = req.wildcards[0];
-        pageList = getPageList(db, inclDrafts=False);
-        slugPageList = filterli(pageList,
-            lambda page: page.meta.slug == slug,
-        ); 
-        if len(slugPageList) > 1:
-            raise vilo.error(oneline("<h2>Slug Overloaded!</h2>"));
-        if not slugPageList:
-            raise vilo.error(autoTpl("404.html", DEFAULT_404, req, res, data={
-                "pageList": pageList,
-            }));
-        # otherwise ...
-        assert len(slugPageList) == 1;
-        currentPage = slugPageList[0];
-        if currentPage.meta.isDraft:
-            raise vilo.error(autoTpl("404.html", DEFAULT_404, req, res, data={
-                "pageList": pageList,
-            }));
-        # otherwise ...
-        return autoTpl(currentPage.meta.template or "page.html",
-            DEFAULT_PAGE, req, res, data={
-                "pageList": pageList,
+        currentPage = getPage(db, {"meta": {"slug": slug}});
+        if not currentPage:
+            raise vilo.error(autoTpl("404.html", DEFAULT_404, req, res));
+        nextPage, prevPage = getNextAndPrevPages(db, currentPage);
+        return autoTpl(
+            currentPage.meta.template, DEFAULT_PAGE, req, res, data={
                 "currentPage": currentPage,
                 "title": currentPage.meta.title + " // " + blogTitle,
                 "isPreview": False,
+                "nextPage": nextPage,
+                "prevPage": prevPage,
             },
         );
-        
-    # TODO: Consider using `if themeDir` guard.
+
     @app.route("GET", "/static/**")
     def get_static (req, res):
         relPath = req.wildcards[0];
-        path = oos.path.join(themeDir, "static/" + relPath);
-        return res.staticFile();
+        if not themeDir:
+            raise errLine("Theme not configured.");
+        # otherwise ...
+        path = os.path.join(themeDir, "static/" + relPath);
+        return res.staticFile(path);
+    
+    ########################################################
+    # Handle Framework Errors: #############################
+    ########################################################
+        
+    @app.frameworkError("route_not_found")
+    @app.frameworkError("file_not_found")
+    def route_not_found (req, res, err):
+        return autoTpl("404.html", DEFAULT_404, req, res);
 
     ########################################################
     # Return built `app`: ##################################
