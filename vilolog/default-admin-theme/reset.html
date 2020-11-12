@@ -1,0 +1,30 @@
+<!doctype html>
+<html>
+<head>
+    {{= data.renderTpl("admin-head-common.html", data=data) =}}
+    <title>{{: data.title :}}</title>
+</head>
+<body>
+    {{=  data.renderTpl("admin-header.html", data=data)  =}}
+    
+    <form id="resetForm" method="POST" class="hidden">
+        <input type="hidden" name="xCsrfToken">
+    </form>
+    <p>
+        To delete all the data, click the button below.<br>
+        <span class="pure-button" onclick="resetClickHandler('/_resetFull');">Reset All</span>
+    </p>
+    <p>
+        To delete all pages, click the button below.<br>
+        <span class="pure-button" onclick="resetClickHandler('/_resetPages');">Reset Pages</span>
+    </p>
+    <script>
+        var resetForm = document.getElementById("resetForm");
+        var resetClickHandler = function (actionTgt) {
+            if (! confirm("Are you sure?")) { return null; }
+            resetForm.xCsrfToken.value = getXCsrfToken();
+            resetForm.setAttribute("action", actionTgt);
+            resetForm.submit();
+        };
+    </script>
+</body>

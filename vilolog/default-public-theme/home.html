@@ -2,11 +2,11 @@
 <!doctype html>
 <html>
 <head>
-    {{= data.renderTpl("commonHead.html", data=data) =}}
+    {{= data.renderTpl("public-head-common.html", data=data) =}}
     <title>{{: data.blogTitle :}}</title>
 </head>
 <body>
-    {{= data.renderTpl("header.html", data=data) =}}
+    {{= data.renderTpl("public-header.html", data=data) =}}
     @= pageList = data.pageList;    # Short alias.
     @= if not pageList:
     @{
@@ -32,6 +32,6 @@
             </div>
         @}
     @}
-    {{= data.renderTpl("footer.html", data=data) =}}
+    {{= data.renderTpl("public-footer.html", data=data) =}}
 </body>
 </html>

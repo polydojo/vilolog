@@ -1,0 +1,46 @@
+html, button, input, select, textarea,
+.pure-g [class *= "pure-u"] {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 16px;
+}
+input, textarea { width: 100%; }
+a { text-decoration: none; }
+body {
+    max-width: 720px;
+    margin: auto;
+}
+blockquote {
+    margin: 0;
+    padding: 1px 0 1px 16px;
+    border-left: 6px solid lightgray;
+    color: gray;
+    font-size: 18px;
+}
+img { max-width: 100%; }
+code { background-color: lightgray; }
+
+/* Quick Helpers: */
+.small { font-size: small; }
+.large { font-size: large; }
+.gray { color: gray; }
+.pull-right { float: right; }
+.inlineBlock { display: inline-block; }
+.center { text-align: center; }
+.monaco, pre, code, input, textarea { font-family: monaco, Consolas, "Lucida Console", monospace; }
+.marginless { margin: 0; }
+.white { color: white; }
+.black { color: black; }
+.red { color: red; }
+.underline { text-decoration: underline; }
+.hidden { display: none; }
+
+.pure-button { border-radius: 4px; }
+.pure-button.thin { padding: 0.25em 0.5em; }
+.pure-button {
+    color: black;
+    background-color: lightgray;
+}
+.pure-button.pure-button-primary {
+    color: white;
+    background-color: green;
+}

@@ -30,22 +30,6 @@ Above, `app` is a Vilo app-container, and `wsgi` is the corresponding pure-WSGI 
 gunicorn blog:wsgi
 ```
 
-Then, [visit `localhost:8000/_setup`](https://localhost:8000/_setup) in your preferred browser to complete setup.
-
-#### Configuring `vilolog.buildApp(.)`:
-`vilolog.buildApp(.)` accepts a number of parameters, only the first of which is required:
-- `pgUrl` (*required*): Postgres connection string.
-- `blogTitle`: Self explanatory. (Default: `"My ViloLog Blog"`)
-- `blogDescription`: Self explanatory. (Default: `"Yet another ViloLog blog."`)
-- `footerLine`: Footer attribution line. (Default: `"Powered by ViloLog."`)
-- `cookieSecret` (*recommended*): Secret string for cookie signing.
-- `antiCsrfSecret` (*recommended*): Secret string for signing anti-CSRF token. (Default: Random UUID.)
-- `themeDir`: Path to custom theme directory. (More on this later.) (Default: Random UUID.)
-- `devMode`: Boolean, indicating if in development mode. (Default: `False`)
-- `redirectMap`: Dictionary, mapping from source path to target path. (Default: `{}`, i.e. no redirects.)
-
-**Note:** While only `pgUrl` is required, passing `cookieSecret` and `antiCsrfSecret` is highly recommended.
-
 Nascent Stage
 ------------------
 ViloLog is currently in a nascent stage. As work progresses, we'll be adding docs, screenshots, theming, etc.

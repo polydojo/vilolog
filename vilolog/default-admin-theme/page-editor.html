@@ -1,0 +1,89 @@
+@= import json, dotsi, pprint;
+@= page = data.page if (data and data.get("page")) else {};
+@= defaultMetaDict = {"title":"Sample Page", "slug":"sample-page", "isoDate":"2020-10-31", "template":"page.html", "isDraft":False};
+@= defaultMetaJStr = json.dumps(defaultMetaDict, indent=4);
+
+<!doctype html>
+<html>
+<head>
+    {{= data.renderTpl("admin-head-common.html", data=data) =}}
+    <title>{{: data.title :}}</title>
+</head>
+<body>
+    {{=  data.renderTpl("admin-header.html", data=data)  =}}
+
+    <form id="pageForm" method="POST" class="pure-form pure-form-stacked">
+        <p>
+            <label>Meta <small class="pull-right">Required props: title, slug, date, template, isDraft</small></label>
+            <textarea name="meta" placeholder='{{: defaultMetaJStr :}}' rows="6" class="monaco"
+                required>{{: json.dumps(page.meta, indent=4) if page.get("meta") else defaultMetaJStr :}}</textarea>
+        </p>
+        <p>
+            <label>Body</label>
+            <textarea name="body" placeholder="Body ..." rows="15" class="monaco" required>{{: page.get("body") or "" :}}</textarea>
+        </p>
+        <p>
+            <input type="hidden" name="xCsrfToken" value="">
+            <button class="pure-button pure-button-primary">Save</button>
+            &nbsp;<span onclick="openPreview()" class="pure-button small">Preview</span>
+        </p>
+    </form>
+    <form id="previewForm" method="POST" action="/_previewPage/{{: page.get("_id") or "" :}}"  class="hidden" target="_blank">
+        <textarea name="meta"></textarea><br><br>
+        <textarea name="body"></textarea><br><br>
+        <input name="xCsrfToken"><br><br>
+        <button>Submit</button>
+    </form>
+    
+    <script>
+        var pageForm = document.getElementById("pageForm");
+        var alertErr = function (s) {
+            alert("Error: " + s);
+            return false;
+        };
+        var submitHandler = function () {
+            var meta = null;
+            try {
+                meta = JSON.parse(pageForm.meta.value);
+            } catch (e) {
+                return alertErr("Invalid meta JSON");
+            }
+            if (! (meta.title && typeof(meta.title) === "string")) {
+                return alertErr("Invalid/missing meta.title.");
+            }
+            if (! (meta.slug && typeof(meta.slug) === "string")) {
+                return alertErr("Invalid/missing meta.slug.");
+            }
+            if (! meta.slug.match(/^[a-zA-Z0-9][a-zA-Z0-9_-]+$/)) {
+                return alertErr("Non-word characters in meta.slug.");
+            }
+            if (! (meta.template && typeof(meta.template) === "string")) {
+                return alertErr("Invalid/missing meta.template.");
+            }
+            if (! meta.isoDate.match(/^\d\d\d\d-\d\d-\d\d$/)) {
+                return alertErr("Invalid/mising meta.isoDate.");
+            }
+            if (! meta.template.endsWith(".html")) {
+                return alertErr("meta.template doesn't end in '.html'.");
+            }
+            if (typeof(meta.isDraft) !== "boolean") {
+                return alertErr("Invalid/missing meta.isDraft.");
+            }
+            pageForm.xCsrfToken.value = getXCsrfToken();
+            return true;
+        };
+        pageForm.onsubmit = submitHandler;  // Alias.
+        
+        var previewForm = document.getElementById("previewForm");
+        var openPreview = function () {
+            if (! submitHandler()) { return null; } // Short ckt.
+            previewForm.meta.value = pageForm.meta.value;
+            previewForm.body.value = pageForm.body.value;
+            previewForm.xCsrfToken.value = pageForm.xCsrfToken.value;
+            previewForm.submit();
+        };
+    </script>
+    
+    
+    {{= data.renderTpl("admin-footer.html", data=data) =}}
+</body>

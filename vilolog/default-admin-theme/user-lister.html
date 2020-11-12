@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head>
+    {{= data.renderTpl("admin-head-common.html", data=data) =}}
+    <title>{{: data.title :}}</title>
+</head>
+<body>
+    {{=  data.renderTpl("admin-header.html", data=data)  =}}
+
+
+    @= userList = data.userList;    # Short alias.
+    <ul>
+        @= for user in userList:
+        @{
+            <li>
+                <h3 class="inlineBlock" style="margin: 5px 0 0 0;">{{: user.name :}}</h3>
+                &nbsp; ({{: user.role :}})
+                &nbsp; <a href="/_editUser/{{: user._id :}}" class="pure-button small thin">EDIT</a>
+            </li>
+        @}
+    </ul>
+
+
+    {{= data.renderTpl("admin-footer.html", data=data) =}}
+</body>
+</html>

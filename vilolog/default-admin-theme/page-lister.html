@@ -1,0 +1,61 @@
+@= import json;
+@= pageList = data.pageList;    # Short alias.
+
+<!doctype html>
+<html>
+<head>
+    {{= data.renderTpl("admin-head-common.html", data=data) =}}
+    <title>{{: data.title :}}</title>
+</head>
+<body>
+    {{=  data.renderTpl("admin-header.html", data=data)  =}}
+    
+    @= if not pageList:
+    @{
+        <br><br>
+        <p>No pages yet. Click '+ New Page' above to create your first!</p>
+        <br><br>
+    @}
+    @= else:
+    @{
+        <ul>
+            @= for page in pageList:
+            @{
+                <li id="page_id_{{: page._id :}}">
+                    <h3 class="inlineBlock" style="margin: 5px 0 0 0;">{{: page.meta.title :}}</h3>
+                    @= if not page.meta.isDraft:
+                    @{
+                        &nbsp; <a href="/{{: page.meta.slug :}}" class="pure-button small thin">VIEW</a>
+                    @}
+                    &nbsp; <a href="/_editPage/{{: page._id :}}" class="pure-button small thin">EDIT</a>
+                    &nbsp; <span onclick="delPage({{: json.dumps(page._id) :}})" class="pure-button small thin">DEL</span>
+                </li>
+            @}
+        </ul>
+        <form id="delForm" class="hidden" method="POST" action="/_deletePage" data-not-target="_blank">
+            <input name="pageId" value=""><br><br>
+            <input name="xCsrfToken"><br><br>
+            <button>Submit</button>
+        </form>
+        <script>
+            var delForm = document.getElementById("delForm");
+            var delPage = function (pageId) {
+                var pageElm = null;
+                if (! confirm("Confirm?")) {
+                    return null;    // Short ckt.
+                }
+                // otherwise ...
+                delForm.pageId.value = pageId;
+                delForm.xCsrfToken.value = getXCsrfToken();
+                delForm.submit();
+                pageElm = document.getElementById("page_id_" + pageId);
+                pageElm.innerHTML = "[DELETING ... ]";
+            };
+        </script>
+    @}
+
+
+    
+    {{= data.renderTpl("admin-footer.html", data=data) =}}
+</body>
+</html>

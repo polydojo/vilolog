@@ -4,11 +4,12 @@
 <!doctype html>
 <html>
 <head>
-    {{= data.renderTpl("commonHead.html", data=data) =}}
+    {{= data.renderTpl("public-head-common.html", data=data) =}}
     <title>{{: data.blogTitle :}}</title>
 </head>
 <body>
-    {{= data.renderTpl("header.html", data=data) =}}
+    {{= data.renderTpl("public-header.html", data=data) =}}
+    {{= "<h1 class='red'>[PREVIEW]</h1>" if data.isPreview else "" =}}
     
     <div class="main">{{= markdown.markdown(data.currentPage.body, extensions=['fenced_code']) =}}</div>
     <br>
@@ -23,6 +24,6 @@
         @}
     </div>
     
-    {{= data.renderTpl("footer.html", data=data) =}}
+    {{= data.renderTpl("public-footer.html", data=data) =}}
 </body>
 </html>

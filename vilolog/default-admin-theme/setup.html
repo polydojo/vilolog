@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head>
+    {{= data.renderTpl("admin-head-common.html", data=data) =}}
+    <title>ViloLog Login</title>
+</head>
+<body>
+
+    <h2>ViloLog Setup</h2>
+    <form method="POST" class="pure-form pure-form-stacked">
+        <p>
+            <label>Full Name</label>
+            <input type="text" name="name" placeholder="Full Name" required>
+        </p>
+        <p>
+            <label>Email Address</label>
+            <input type="email" name="email" placeholder="Email Address" class="monaco" required>
+        </p>
+        <p>
+            <label>Password</label>
+            <input type="password" name="password" placeholder="Password" required>
+        </p>
+        <p><button class="pure-button pure-button-primary">Submit</button></p>
+    </form>
+
+</body>

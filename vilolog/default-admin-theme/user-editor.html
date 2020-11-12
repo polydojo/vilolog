@@ -1,0 +1,50 @@
+@= import json;
+@= thatUser = data.thatUser if (data and data.get("thatUser")) else {};
+<!doctype html>
+<html>
+<head>
+    {{= data.renderTpl("admin-head-common.html", data=data) =}}
+    <title>{{: data.title :}}</title>
+</head>
+<body>
+    {{=  data.renderTpl("admin-header.html", data=data)  =}}
+
+
+    <form id="userForm" method="POST" class="pure-form pure-form-stacked">
+        <p>
+            <label>Name</label>
+            <input type="text" name="name" value="{{: thatUser.get('name') or '' :}}" placeholder="Full Name" required>
+        </p>
+        <p>
+            <label>Email</label>
+            <input type="email" name="email" value="{{: thatUser.get('email') or '' :}}" placeholder="Email Address" class="monaco"
+                {{: 'readonly' if thatUser.get('email') else '' :}} required
+            >
+        </p>
+        <p>
+            <label>Password <small>{{: "(Update Optionally)" if thatUser else "" :}}</small></label>
+            <input type="password" name="password" placeholder="Password" value="">
+        </p>
+        <p>
+            <label>Role</label>
+            <input type="text" name="role" placeholder="Role: admin/author/deactivated" value="{{: thatUser.get('role', '') :}}"
+                pattern="admin|author|deactivated" required
+            >
+        </p>
+        <p>
+            <input type="hidden" name="xCsrfToken" value="">
+            <button class="pure-button pure-button-primary">Save</button>
+        </p>
+    </form>
+    <script>
+        var form = document.getElementById("userForm");
+        form.onsubmit = function () {
+            form.xCsrfToken.value = getXCsrfToken();
+            return true;
+        };
+    </script>
+
+
+    {{= data.renderTpl("admin-footer.html", data=data) =}}
+</body>
+</html>
