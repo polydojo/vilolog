@@ -31,6 +31,7 @@ import re;
 import functools;
 import json;
 import pprint;
+import traceback;
 
 import bcrypt;
 import dateutil;
@@ -100,7 +101,7 @@ LAYOUT = r"""
         .pull-right { float: right; }
         .inlineBlock { display: inline-block; }
         .center { text-align: center; }
-        .monaco { font-family: monaco, Consolas, "Lucida Console", monospace; }
+        .monaco, pre, code { font-family: monaco, Consolas, "Lucida Console", monospace; }
         .marginless { margin: 0; }
         .white { color: white; }
         .black { color: black; }
@@ -624,10 +625,14 @@ def buildApp (
         cookieSecret = genId(3),
         antiCsrfSecret = genId(3),
         themeDir = None,
+        devMode = False,
+        redirectMap = None,
     ):
+    redirectMap = redirectMap or {};
     app = vilo.buildApp();
     wsgi = app.wsgi;
     dbful = pogodb.makeConnector(pgUrl);
+    if devMode: app.setDebug(True);
     
     ########################################################
     # Templating Helpers: ##################################
@@ -659,7 +664,10 @@ def buildApp (
             "title": data.title, "bodyHtml": bodyHtml,
         }));
 
-    def oneLine (sentence):
+    def oneLine (sentence, seq=()):
+        "Helper for producing one-line responses.";
+        if seq is not ():
+            sentence = vilo.escfmt(sentence, seq);
         spPaths = re.findall(r"\s/_\w+", sentence);
         # ^ Pattern: <space> <slash> <underscore> <onePlusWordChars>
         for spPath in spPaths:
@@ -674,22 +682,34 @@ def buildApp (
             "bodyHtml": sentence,
         }));
     
-    def errLine (sentence):
-        return vilo.error(oneLine(sentence));
+    def errLine (sentence, seq=()):
+        "Helper for producing one-line error responses.";
+        return vilo.error(oneLine(sentence, seq));
     
     def customTpl (filename, req, res, data=None):
+        "Helper for rendering custom (`themeDir`) templates.";
         data = dotsi.defaults(dotsi.fy({}), data or {}, {
             "blogTitle": blogTitle,
             "blogDescription": blogDescription,
             "req": req, "res": res,
+            "renderTpl": lambda filename, data=None: customTpl(
+                filename, req, res, data=data,
+            ),
+            "footerLine": footerLine,
         });
         path = os.path.join(themeDir, filename);
+        #path = os.path.abspath(path);
         try:
             return qree.renderPath(path, data=data);
         except IOError as e:
-            raise errLine("ERROR: TEMPLATE NOT FOUND");
+            # Note: Err may even be caused by a nested tpl.
+            print("\n" + traceback.format_exc() + "\n");
+            raise errLine("ERROR: Template <code>%s</code> not found.",
+                e.filename,
+            );
     
     def autoTpl (filename, innerTpl, req, res, data=None):
+        "Helper, auto-picks between custom/default templates.";
         if not themeDir:
             return defaultTpl(innerTpl, data);
         # otherwise ...
@@ -704,7 +724,7 @@ def buildApp (
         res.setCookie("userId", user._id, cookieSecret);
         xCsrfToken = vilo.signWrap(user._id, antiCsrfSecret);
         res.setUnsignedCookie("xCsrfToken", xCsrfToken, {"httponly": False});
-        return res;
+        return res.redirect("/_pages");
 
     def clearLoginSession (res):
         res.setCookie("userId", "");
@@ -774,7 +794,9 @@ def buildApp (
         d = req.fdata;
         user = buildUser(d.name, d.email, d.password, role="admin");
         db.insertOne(user);
-        return oneLine("Done! Setup complete. Proceed to: /_login");
+        #return oneLine("Done! Setup complete. Proceed to: /_login");
+        #return res.redirect("/_login");
+        return startLoginSession(user, res);
     
     @app.route("GET", "/_reset")
     @authful
@@ -787,7 +809,8 @@ def buildApp (
     def get_reset (req, res, user, db):
         assert user.role == "admin";
         db.clearTable(sure=True);
-        return oneLine("Done! Proceed to: /_setup");
+        #return oneLine("Done! Proceed to: /_setup");
+        return res.redirect("/_setup");
 
     @app.route("POST", "/_resetPages")
     @authful
@@ -796,9 +819,10 @@ def buildApp (
         pageList = getAllPages_inclDrafts(db);
         for page in pageList:
             db.deleteOne(page._id);
-        return oneLine(vilo.escfmt(
-            "Done! Deleted %s pages. See: /_pages", len(pageList),
-        ));
+        #return oneLine(vilo.escfmt(
+        #    "Done! Deleted %s pages. See: /_pages", len(pageList),
+        #));
+        return res.redirect("/_pages");
 
     ########################################################
     # Login/logout: ########################################
@@ -819,9 +843,8 @@ def buildApp (
             raise errLine("Email/password mismatch.");
         if user.role == "deactivated":
             raise errLine("Access deactivated.");
-        startLoginSession(user, res);
+        return startLoginSession(user, res);
         #return oneLine("Done! Proceed to: /_pages");
-        return res.redirect("/_pages");
 
     @app.route("GET", "/_logout")
     def get_logout (req, res):
@@ -1015,6 +1038,10 @@ def buildApp (
         "Decorator for auto-caching reposne by path.";
         @functools.wraps(fn)
         def wrapper (req, res, *a, **ka):
+            if devMode:
+                print("Caching disabled on accout of `devMode`.");
+                return fn(req, res, *a, **ka);
+            # otherwise ...
             path = req.getPathInfo();
             if path not in pathCache:
                 print("Caching ...");
@@ -1087,7 +1114,7 @@ def buildApp (
     def get_static (req, res):
         relPath = req.wildcards[0];
         if not themeDir:
-            raise errLine("Theme not configured.");
+            raise errLine("ERROR: Theme not configured.");
         # otherwise ...
         path = os.path.join(themeDir, "static/" + relPath);
         return res.staticFile(path);
@@ -1099,6 +1126,10 @@ def buildApp (
     @app.frameworkError("route_not_found")
     @app.frameworkError("file_not_found")
     def route_not_found (req, res, err):
+        path = req.getPathInfo();
+        if path in redirectMap:
+            return res.redirect(redirectMap[path]);
+        # otherwise ...
         return autoTpl("404.html", DEFAULT_404, req, res);
 
     ########################################################

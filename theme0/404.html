@@ -1,0 +1,27 @@
+@=# data: {blogTitle, blogDescription, footerLine}
+@= import qree;
+<!doctype html>
+<html>
+<head>
+    {{= data.renderTpl("commonHead.html", data=data) =}}
+    <title>{{: data.blogTitle :}}</title>
+</head>
+<body>
+    {{= data.renderTpl("header.html", data=data) =}}
+    
+    <p class="small gray marginless">404 Not Found</p>
+    <h1>Oops! That page can't be found!</h1>
+    <p class="large">
+        The page you're looking for is nowhere to be found.
+        A search party should soon be dispatched to find it.
+    </p>
+    <p>
+        <a class="pure-button pure-button-primary large" href="/">Visit Homepage</a>
+        &nbsp;<code>OR</code>&nbsp;
+        <a class="pure-button large" href="javascript:history.back();">Go Back</a>
+    </p>
+
+    
+    {{= data.renderTpl("footer.html", data=data) =}}
+</body>
+</html>
