@@ -41,7 +41,7 @@ import dotsi;
 import pogodb;
 import qree;
 
-__version__ = "0.0.2-preview";  # Req'd by flit.
+__version__ = "0.0.2";  # Req'd by flit.
 USER_VERSION = 0;
 PAGE_VERSION = 0;
 
@@ -618,7 +618,7 @@ def getAllPages_exclDrafts (db):
 ############################################################
 
 def buildApp (
-        pgUrl,
+        pgUrl, # 1st positional param
         blogTitle = "My ViloLog",
         blogDescription = "Yet another ViloLog blog.",
         footerLine = "Powered by ViloLog.",
@@ -1136,5 +1136,10 @@ def buildApp (
     # Return built `app`: ##################################
     ########################################################
     return app;
+
+def tmp_getFullPath_theme0 (filename="home.html"):
+    vilologPath = os.path.realpath(__file__);
+    filePath = os.path.join(vilologPath, "theme0", filename);
+    return os.path.abspath(filePath);
 
 # End ######################################################
