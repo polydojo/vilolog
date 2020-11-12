@@ -27,6 +27,8 @@ img { max-width: 100%; }
 .center { text-align: center; }
 .monaco, pre, code { font-family: monaco, Consolas, "Lucida Console", monospace; }
 .marginless { margin: 0; }
+.topmarginless { margin-top: 0; }
+.bottommarginless { margin-bottom: 0; }
 .white { color: white; }
 .black { color: black; }
 .red { color: red; }

@@ -9,30 +9,42 @@ Installation
 pip install vilolog
 ```
 
-ViloLog builds a pure WSGI app. To run that ap, you'll need Gunicorn, Waitress or another WSGI server. Gunicorn is installable via:
+ViloLog builds a pure WSGI appliation. To run that application, you'll need Gunicorn, Waitress or another WSGI server. Gunicorn is installable via:
 ```
 pip install gunicorn
 ```
 
-Basic Usage
----------------
+Usage
+--------
 #### Minimal Setup:
-At the very least, just supply a Postgres connection string to `vilolog.buildApp(.)`.
+Pass a Postgres connection string to `vilolog.buildApp(.)` to create your blog.
 
-Create `minimal.py`:
-```
+Create module `blog.py`:
+```py
 import vilolog;
 app = vilolog.buildApp("postgres://...dsn..");
 wsgi = app.wsgi;
 ```
-Run using Gunicorn:
+Above, `app` is a Vilo app-container, and `wsgi` is the corresponding pure-WSGI callable. To run `wsgi` via Gunicorn:
 ```
-gunicorn minimal:wsgi
+gunicorn blog:wsgi
 ```
 
-#### Full Setup:
-Via `vilolog.buildApp(.)`, you can configure the blog's title, description, footer, redirects etc. (Currently undocumented.)
+Then, [visit `localhost:8000/_setup`](https://localhost:8000/_setup) in your preferred browser to complete setup.
 
+#### Configuring `vilolog.buildApp(.)`:
+`vilolog.buildApp(.)` accepts a number of parameters, only the first of which is required:
+- `pgUrl` (*required*): Postgres connection string.
+- `blogTitle`: Self explanatory. (Default: `"My ViloLog Blog"`)
+- `blogDescription`: Self explanatory. (Default: `"Yet another ViloLog blog."`)
+- `footerLine`: Footer attribution line. (Default: `"Powered by ViloLog."`)
+- `cookieSecret` (*recommended*): Secret string for cookie signing.
+- `antiCsrfSecret` (*recommended*): Secret string for signing anti-CSRF token. (Default: Random UUID.)
+- `themeDir`: Path to custom theme directory. (More on this later.) (Default: Random UUID.)
+- `devMode`: Boolean, indicating if in development mode. (Default: `False`)
+- `redirectMap`: Dictionary, mapping from source path to target path. (Default: `{}`, i.e. no redirects.)
+
+**Note:** While only `pgUrl` is required, passing `cookieSecret` and `antiCsrfSecret` is highly recommended.
 
 Nascent Stage
 ------------------

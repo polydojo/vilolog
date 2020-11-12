@@ -41,7 +41,7 @@ import dotsi;
 import pogodb;
 import qree;
 
-__version__ = "0.0.2";  # Req'd by flit.
+__version__ = "0.0.3";  # Req'd by flit.
 USER_VERSION = 0;
 PAGE_VERSION = 0;
 
@@ -93,6 +93,7 @@ LAYOUT = r"""
             font-size: 18px;
         }
         img { max-width: 100%; }
+        code { background-color: lightgray; }
         
         /* Quick Helpers: */
         .small { font-size: small; }
@@ -619,7 +620,7 @@ def getAllPages_exclDrafts (db):
 
 def buildApp (
         pgUrl, # 1st positional param
-        blogTitle = "My ViloLog",
+        blogTitle = "My ViloLog Blog",
         blogDescription = "Yet another ViloLog blog.",
         footerLine = "Powered by ViloLog.",
         cookieSecret = genId(3),
@@ -1039,14 +1040,14 @@ def buildApp (
         @functools.wraps(fn)
         def wrapper (req, res, *a, **ka):
             if devMode:
-                print("Caching disabled on accout of `devMode`.");
+                #print("Caching disabled on accout of `devMode`.");
                 return fn(req, res, *a, **ka);
             # otherwise ...
             path = req.getPathInfo();
             if path not in pathCache:
-                print("Caching ...");
+                #print("Caching ...");
                 pathCache[path] = fn(req, res, *a, **ka);
-            else: print("Already cached!");
+            #else: print("Already cached!");
             return pathCache[path];
         return wrapper;
     
@@ -1056,7 +1057,7 @@ def buildApp (
         def wrapper (req, res, *a, **ka):
             if req.getVerb() == "POST":
                 pathCache.clear();
-                print("Cache cleared.");
+                #print("Cache cleared.");
             return fn(req, res, *a, **ka);
         return wrapper;
     app.install(plugin_clearPathCacheOnPost);
@@ -1137,9 +1138,12 @@ def buildApp (
     ########################################################
     return app;
 
-def tmp_getFullPath_theme0 (filename="home.html"):
-    vilologPath = os.path.realpath(__file__);
-    filePath = os.path.join(vilologPath, "theme0", filename);
-    return os.path.abspath(filePath);
+def tmp_theme0 (filename):
+    pkgDir = os.path.dirname(os.path.realpath(__file__));
+    print("pkgDir =", pkgDir);
+    filepath = os.path.join(pkgDir, "theme0", filename);
+    print("filepath =", filepath);
+    print("os.path.isfile(.) =>", os.path.isfile(filepath));
+    return filepath;
 
 # End ######################################################

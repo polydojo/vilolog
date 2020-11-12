@@ -19,14 +19,16 @@
         @= for page in pageList:
         @{
             <div class="pageItem">
-                <h3>
+                <p class="bottommarginless monaco">{{: page.meta.get("isoDate") :}}</p>
+                <h3 class="topmarginless">
                     <a href="/{{: page.meta.slug :}}">{{: page.meta.title :}}</a>
                 </h3>
                 @= if page.meta.get("excerpt"):
                 @{
                     <p>{{: page.meta.excerpt :}}</p>
+                    <p class="align-right"><a href="/{{: page.meta.slug :}}">Read more ...</a></p>
                 @}
-                <p class="align-right"><a href="/{{: page.meta.slug :}}">Continue ...</a></p>
+                <br>
             </div>
         @}
     @}
