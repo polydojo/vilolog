@@ -25,3 +25,5 @@ trademarks, service marks, brand names or logos of Polydojo, Inc.
 """;
 
 from .vilolog import *;
+
+__version__ = vilolog.__version__;
