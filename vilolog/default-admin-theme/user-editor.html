@@ -31,6 +31,12 @@
                 pattern="admin|author|deactivated" required
             >
         </p>
+        <!-- TODO:
+        <p> <label>Author Bio</label>
+            <textarea name="bio" placeholder="{{: thatUser.get('bio') or '' :}}" rows="6" class="monaco"
+                required>{{: json.dumps(page.meta, indent=4) if page.get("meta") else defaultMetaJStr :}}</textarea>
+        </p>
+        -->
         <p>
             <input type="hidden" name="xCsrfToken" value="">
             <button class="pure-button pure-button-primary">Save</button>

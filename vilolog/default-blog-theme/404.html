@@ -3,11 +3,11 @@
 <!doctype html>
 <html>
 <head>
-    {{= data.renderTpl("public-head-common.html", data=data) =}}
+    {{= data.renderTpl("blog-head-common.html", data=data) =}}
     <title>{{: data.blogTitle :}}</title>
 </head>
 <body>
-    {{= data.renderTpl("public-header.html", data=data) =}}
+    {{= data.renderTpl("blog-header.html", data=data) =}}
     
     <p class="small gray marginless">404 Not Found</p>
     <h1>Oops! That page can't be found!</h1>
@@ -22,6 +22,6 @@
     </p>
 
     
-    {{= data.renderTpl("public-footer.html", data=data) =}}
+    {{= data.renderTpl("blog-footer.html", data=data) =}}
 </body>
 </html>

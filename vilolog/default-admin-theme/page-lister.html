@@ -27,6 +27,10 @@
                     @{
                         &nbsp; <a href="/{{: page.meta.slug :}}" class="pure-button small thin">VIEW</a>
                     @}
+                    @= else:
+                    @{
+                        &nbsp; <a href="/_previewPage/{{: page._id :}}" target="_blank" class="pure-button small thin">PREVIEW</a>
+                    @}
                     &nbsp; <a href="/_editPage/{{: page._id :}}" class="pure-button small thin">EDIT</a>
                     &nbsp; <span onclick="delPage({{: json.dumps(page._id) :}})" class="pure-button small thin">DEL</span>
                 </li>

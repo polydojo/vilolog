@@ -36,10 +36,10 @@ code { background-color: lightgray; }
 
 .pure-button { border-radius: 4px; }
 .pure-button.thin { padding: 0.25em 0.5em; }
-.pure-button {
+/*.pure-button {
     color: black;
     background-color: lightgray;
-}
+}*/
 .pure-button.pure-button-primary {
     color: white;
     background-color: green;
