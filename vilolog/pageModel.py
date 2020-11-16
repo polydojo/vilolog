@@ -33,17 +33,8 @@ from . import utils;
 
 PAGE_VERSION = 0;
 
-def validatePage (page, blogId):
-    "Validates `page` schema.";
-    assert type(page) in [dict, dotsi.Dict];
-    page = dotsi.fy(page);
-    assert page._id and type(page._id) is str;
-    assert type(page.blogId) is str and page.blogId == blogId;
-    assert page.version == PAGE_VERSION;
-    assert page.type == "page";
-    # Meta Starts:
-    assert type(page.meta) == dotsi.Dict;
-    meta = page.meta;
+def validateMeta (meta):
+    assert type(meta) is dotsi.Dict;
     assert meta.title and type(meta.title) is str;
     assert meta.slug and type(meta.slug) is str;
     assert re.match(r"^[a-zA-Z0-9][a-zA-Z0-9_-]+$", meta.slug);
@@ -52,7 +43,17 @@ def validatePage (page, blogId):
     assert meta.template and type(meta.template) is str;
     assert meta.template.endswith(".html");
     assert type(meta.isDraft) is bool;
-    # Meta Ends;
+    return True;
+
+def validatePage (page, blogId):
+    "Validates `page` schema.";
+    assert type(page) in [dict, dotsi.Dict];
+    page = dotsi.fy(page);
+    assert page._id and type(page._id) is str;
+    assert type(page.blogId) is str and page.blogId == blogId;
+    assert page.version == PAGE_VERSION;
+    assert page.type == "page";
+    assert validateMeta(page.meta);
     assert page.body and type(page.body) is str;
     assert page.authorId and type(page.authorId) is str;
     assert page.createdAt and type(page.createdAt) is int;
@@ -121,11 +122,11 @@ def getNextAndPrevPages (db, page, blogId):
 
 def getPageList (db, subdoc, blogId):
     subdoc.update({"type": "page", "blogId": blogId});
-    # Either:
-    pageList = db.find(subdoc);
-    pageList = utils.mapli(pageList, lambda p: adaptPage(db, p));
-    pageList.sort(key=lambda p: p.meta.isoDate, reverse=True);
-    # OR:
+    ## Either:
+    #pageList = db.find(subdoc);
+    #pageList = utils.mapli(pageList, lambda p: adaptPage(db, p));
+    #pageList.sort(key=lambda p: p.meta.isoDate, reverse=True);
+    ## OR:
     pageList = db.find(subdoc, whereEtc="""
         ORDER BY doc->'meta'->>'isoDate' DESC
     """);
@@ -135,6 +136,7 @@ def getPageList (db, subdoc, blogId):
 
 def getAllPages_inclDrafts (db, blogId):
     return getPageList(db, {}, blogId);
+
 def getAllPages_exclDrafts (db, blogId):
     return getPageList(db, {"meta": {"isDraft": False}}, blogId);
 

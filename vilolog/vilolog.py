@@ -45,7 +45,7 @@ from . import utils;
 from . import pageModel;
 from . import userModel;
 
-__version__ = "0.0.5-preview";  # Req'd by flit.
+__version__ = "0.0.5";  # Req'd by flit.
 
 PKG_DIR = os.path.dirname(os.path.realpath(__file__));
 DEFAULT_ADMIN_THEME_DIR = os.path.join(PKG_DIR, "default-admin-theme");
@@ -126,34 +126,117 @@ def errLine (sentence, seq=()):
     return vilo.error(oneLine(sentence, seq));
 
 ############################################################
+# Quick Plugins: ###########################################
+############################################################
+
+
+def checkLocalhost (netloc):
+    "Helper for checking if `netloc` is localhost.";
+    return netloc.split(":")[0] == "localhost";
+
+def plugin_enforceRemoteHttps (fn):
+    "Plugin for enforcing https.";
+    @functools.wraps(fn)
+    def wrapper (req, res, *a, **ka):
+        print("Entered plugin_enforceRemoteHttps().");
+        scheme = req.splitUrl.scheme;
+        netloc = req.splitUrl.netloc;
+        if checkLocalhost(netloc):
+            pass;       # No enforcement w.r.t localhost.
+        elif scheme != "https":
+            secureUrl = req.url.replace(scheme, "https", 1);
+            print("Early exiting plugin_enforceRemoteHttps().");
+            return res.redirect(secureUrl);
+        # otherwise ...
+        print("Properly exiting plugin_enforceRemoteHttps().");
+        return fn(req, res, *a, **ka);
+    return wrapper;
+
+def mkPlugin_enforceRemoteNetloc (netlocList):
+    "Makes a plugin for enforcing netlocs in `netlocList`.";
+    assert len(netlocList) >= 1 and type(netlocList[0]) is str;
+    def plugin_enforceRemoteNetloc (fn):
+        @functools.wraps(fn)
+        def wrapper (req, res, *a, **ka):
+            print("Entered plugin_enforceRemoteNetloc().");
+            netloc = req.splitUrl.netloc;
+            if checkLocalhost(netloc):
+                pass;   # No enforcement w.r.t localhost.
+            elif netloc not in netlocList:
+                newUrl = req.url.replace(netloc, netlocList[0], 1);
+                print("Early exiting plugin_enforceRemoteNetloc().");
+                return res.redirect(newUrl);
+            # otherwise ...
+            print("Properly exiting plugin_enforceRemoteNetloc().");
+            return fn(req, res, *a, **ka);
+        return wrapper;
+    return plugin_enforceRemoteNetloc;
+
+def mkPlugin_disableRemoteLogin (blogTpl):
+    "Makes plugin for disable remote (non-localhost) login.";
+    # Helper:
+    def checkAccessOk (netloc, path):
+        if checkLocalhost(netloc):
+            return True;    # On localhost, always allowed.
+        if path.startswith("/_blog_static/"):
+            return True;    # Special path, always allowed.
+        if not path.startswith("/_"):
+            return True;    # Non-admin path, always allowed.
+        # otherwise ...
+        return False;
+    # Plugin:
+    def plugin_disableRemoteLogin (fn):
+        @functools.wraps(fn)
+        def wrapper (req, res, *a, **ka):
+            print("Entered plugin_disableRemoteLogin().");
+            netloc = req.splitUrl.netloc;
+            path = req.getPathInfo();
+            if not checkAccessOk(netloc, path):
+                print("Early exiting plugin_disableRemoteLogin().");
+                raise vilo.error(blogTpl("404.html",
+                    data={"req": req, "res": res},
+                ));
+            print("Properly exiting plugin_disableRemoteLogin().");
+            return fn(req, res, *a, **ka);
+        return wrapper;
+    return plugin_disableRemoteLogin;
+
+############################################################
 # Build: ###################################################
 ############################################################
 
 def buildApp (
         pgUrl, # 1st positional param
+        blogId = "",
         blogTitle = "My ViloLog Blog",
         blogDescription = "Yet another ViloLog blog.",
         footerLine = "Powered by ViloLog.",
-        cookieSecret = utils.genId(3),
-        antiCsrfSecret = utils.genId(3),
-        adminThemeDir = DEFAULT_ADMIN_THEME_DIR,
+        cookieSecret = "",
+        antiCsrfSecret = "",
         blogThemeDir = DEFAULT_BLOG_THEME_DIR,
+        _adminThemeDir = DEFAULT_ADMIN_THEME_DIR,
         devMode = False,
         redirectMap = None,
         loginSlug = "_login",
-        allowRemoteLogin = True,
-        blogId = "",
+        disableRemoteLogin = False,
+        remoteNetlocList = None,
+        remoteHttpsOnly = False,
     ):
+    ########################################################
+    # Prelims: #############################################
+    ########################################################
+    # Param defaults:
     redirectMap = redirectMap or {};
-    app = vilo.buildApp();
-    wsgi = app.wsgi;
-    dbful = pogodb.makeConnector(pgUrl, verbose=False);
-    if devMode: app.setDebug(True);
-    if not re.match(r"^_login\w*$", loginSlug):
-        raise ValueError(r"Invalid `loginSlug`. Must be of the form: r'_login\w*'");
-    loginPath = "/" + loginSlug;
+    remoteNetlocList = remoteNetlocList or [];
+    if devMode:
+        cookieSecret = cookieSecret or "dev_cookie_secret";
+        antiCsrfSecret = antiCsrfSecret or "dev_xCsrf_secret";
+    else:
+        cookieSecret = cookieSecret or utils.genId(3);
+        antiCsrfSecret = antiCsrfSecret or utils.genId(3);
     
-    validateThemeDir(adminThemeDir, [
+    # Validate params, etc:
+    validateThemeDir(_adminThemeDir, [
         "setup.html", "login.html", "reset.html",
         "page-lister.html", "page-editor.html",
         "user-lister.html", "user-editor.html",
@@ -161,11 +244,19 @@ def buildApp (
     validateThemeDir(blogThemeDir, [
         "home.html", "page.html", "404.html",
     ]);
-
-    adminTpl = mkRenderTpl(adminThemeDir, {
+    if not re.match(r"^_login\w*$", loginSlug):
+        raise ValueError(r"Invalid `loginSlug`, doesn't match: r'_login\w*'");
+    loginPath = "/" + loginSlug;
+    
+    # Build app, db-connector:
+    app = vilo.buildApp();
+    dbful = pogodb.makeConnector(pgUrl, verbose=False);
+    if devMode: app.setDebug(True);
+    
+    # Renderers:
+    adminTpl = mkRenderTpl(_adminThemeDir, {
         "blogTitle": blogTitle,
         "blogDescription": blogDescription,
-        #"title": blogTitle,
         "footerLine": footerLine,
     });
     blogTpl = mkRenderTpl(blogThemeDir, {
@@ -173,6 +264,14 @@ def buildApp (
         "blogDescription": blogDescription,
         "footerLine": footerLine,    
     });
+
+    # Install plugins:
+    if remoteHttpsOnly:
+        app.install(plugin_enforceRemoteHttps);
+    if remoteNetlocList:
+        app.install(mkPlugin_enforceRemoteNetloc(remoteNetlocList));
+    if disableRemoteLogin:
+        app.install(mkPlugin_disableRemoteLogin(blogTpl));
 
     ########################################################
     # Authentication Helpers: ##############################
@@ -210,12 +309,12 @@ def buildApp (
             raise errLine("Access deactivated.");
         return user;
 
-    def authful (oFunc):
+    def authful (fn):
         @dbful
-        def nFunc(req, res, db, *args, **kwargs):
+        def wrapper(req, res, db, *a, **ka):
             user = getCurrentUser(db, req);
-            return oFunc(req, res, db=db, user=user, *args, **kwargs);
-        return functools.update_wrapper(nFunc, oFunc);
+            return fn(req, res, db=db, user=user, *a, **ka);
+        return functools.update_wrapper(wrapper, fn);
     
     def validatePageEditDelRole (user, page):
         assert user.role != "deactivated";
@@ -227,33 +326,6 @@ def buildApp (
             Only admins and page-authors can edit/delete pages.
         """);
     
-    if not allowRemoteLogin:
-        def plugin_enforce_allowRemoteLogin (fn):
-            "Plugin for enforcing buildApp()'s `allowRemoteLogin` param.";
-            def checkAccessOk (netloc, path):
-                if path.startswith("/_blog_static/"):
-                    return True;    # Special, allowed path.
-                if not path.startswith("/_"):
-                    return True;    # Non-admin path.
-                #?TODO: netloc.split(":")[0] == "localhost"
-                if netloc.startswith("localhost:"):
-                    return True;    # On localhost.
-                # otherwise ...
-                return False;
-                
-            @functools.wraps(fn)
-            def wrapper (req, res, *a, **ka):
-                netloc = req.splitUrl.netloc;
-                path = req.getPathInfo();
-                if not checkAccessOk(netloc, path):
-                    raise vilo.error(blogTpl("404.html",
-                        data={"req": req, "res": res},
-                    ));
-                return fn(req, res, *a, **ka);
-            return wrapper;
-        app.install(plugin_enforce_allowRemoteLogin);
-        # Installed immediately, if required.
-
     ########################################################
     # Setup: ###############################################
     ########################################################
@@ -626,7 +698,7 @@ def buildApp (
     @app.route("GET", "/_admin_static/**")
     def get_admin_static (req, res):
         return res.staticFile(os.path.join(
-            adminThemeDir, "static", req.wildcards[0],
+            _adminThemeDir, "static", req.wildcards[0],
         ));
     
     @app.route("GET", "/_blog_static/**")
@@ -643,7 +715,7 @@ def buildApp (
     @app.frameworkError("file_not_found")
     def route_not_found (req, res, err):
         path = req.getPathInfo();
-        if path in redirectMap:
+        if redirectMap and path in redirectMap:
             return res.redirect(redirectMap[path]);
         # otherwise ...
         return blogTpl("404.html", data={"req": req, "res": res});
