@@ -13,9 +13,9 @@ requires = [
     "bcrypt >=3.2.0",
     "dotsi >=0.0.3",
     "Markdown >=3.3.3",
-    "pogodb >=0.0.2",
+    "pogodb >=0.0.3",
     "psycopg2-binary >=2.8.6",
     "python-dateutil >=2.8.1",
     "qree >=0.0.2",
-    "vilo >=0.0.4",
+    "vilo >=0.0.5",
 ]

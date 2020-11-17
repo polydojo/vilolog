@@ -41,7 +41,7 @@ Hupper is useful for development and testing, but needn't be used in production.
 Once running, [visit `localhost:8080/_setup`](https://localhost:8000/_setup) in your preferred browser to complete setup.
 
 #### Logging In
-After completing setup, you should be able to login to your blog. By default, you can log in by visiting `/_login`; but this can be configured via `.buildApp(.)`'s `loginSlug` parameter, documented blow.
+After completing setup, you should be able to login to your blog. By default, you can log in by visiting `/_login`; but this can be configured via `.buildApp(.)`'s `loginSlug` parameter, documented below.
 
 Options
 ----------

@@ -45,7 +45,7 @@ from . import utils;
 from . import pageModel;
 from . import userModel;
 
-__version__ = "0.0.5";  # Req'd by flit.
+__version__ = "0.0.6";  # Req'd by flit.
 
 PKG_DIR = os.path.dirname(os.path.realpath(__file__));
 DEFAULT_ADMIN_THEME_DIR = os.path.join(PKG_DIR, "default-admin-theme");
@@ -138,17 +138,17 @@ def plugin_enforceRemoteHttps (fn):
     "Plugin for enforcing https.";
     @functools.wraps(fn)
     def wrapper (req, res, *a, **ka):
-        print("Entered plugin_enforceRemoteHttps().");
+        #print("Entered plugin_enforceRemoteHttps().");
         scheme = req.splitUrl.scheme;
         netloc = req.splitUrl.netloc;
         if checkLocalhost(netloc):
             pass;       # No enforcement w.r.t localhost.
         elif scheme != "https":
             secureUrl = req.url.replace(scheme, "https", 1);
-            print("Early exiting plugin_enforceRemoteHttps().");
+            #print("Early exiting plugin_enforceRemoteHttps().");
             return res.redirect(secureUrl);
         # otherwise ...
-        print("Properly exiting plugin_enforceRemoteHttps().");
+        #print("Properly exiting plugin_enforceRemoteHttps().");
         return fn(req, res, *a, **ka);
     return wrapper;
 
@@ -158,16 +158,16 @@ def mkPlugin_enforceRemoteNetloc (netlocList):
     def plugin_enforceRemoteNetloc (fn):
         @functools.wraps(fn)
         def wrapper (req, res, *a, **ka):
-            print("Entered plugin_enforceRemoteNetloc().");
+            #print("Entered plugin_enforceRemoteNetloc().");
             netloc = req.splitUrl.netloc;
             if checkLocalhost(netloc):
                 pass;   # No enforcement w.r.t localhost.
             elif netloc not in netlocList:
                 newUrl = req.url.replace(netloc, netlocList[0], 1);
-                print("Early exiting plugin_enforceRemoteNetloc().");
+                #print("Early exiting plugin_enforceRemoteNetloc().");
                 return res.redirect(newUrl);
             # otherwise ...
-            print("Properly exiting plugin_enforceRemoteNetloc().");
+            #print("Properly exiting plugin_enforceRemoteNetloc().");
             return fn(req, res, *a, **ka);
         return wrapper;
     return plugin_enforceRemoteNetloc;
@@ -188,15 +188,15 @@ def mkPlugin_disableRemoteLogin (blogTpl):
     def plugin_disableRemoteLogin (fn):
         @functools.wraps(fn)
         def wrapper (req, res, *a, **ka):
-            print("Entered plugin_disableRemoteLogin().");
+            #print("Entered plugin_disableRemoteLogin().");
             netloc = req.splitUrl.netloc;
             path = req.getPathInfo();
             if not checkAccessOk(netloc, path):
-                print("Early exiting plugin_disableRemoteLogin().");
+                #print("Early exiting plugin_disableRemoteLogin().");
                 raise vilo.error(blogTpl("404.html",
                     data={"req": req, "res": res},
                 ));
-            print("Properly exiting plugin_disableRemoteLogin().");
+            #print("Properly exiting plugin_disableRemoteLogin().");
             return fn(req, res, *a, **ka);
         return wrapper;
     return plugin_disableRemoteLogin;
@@ -605,45 +605,11 @@ def buildApp (
         userModel.replaceUser(db, thatUser, blogId);
         return res.redirect("/_users");
 
-
-    ########################################################
-    # Caching Helpers: #####################################
-    ########################################################
-
-    pathCache = dotsi.fy({});
-    def pathCacheful (fn):
-        "Decorator for auto-caching reposne by path.";
-        @functools.wraps(fn)
-        def wrapper (req, res, *a, **ka):
-            if devMode:
-                #print("Caching disabled on accout of `devMode`.");
-                return fn(req, res, *a, **ka);
-            # otherwise ...
-            path = req.getPathInfo();
-            if path not in pathCache:
-                #print("Caching ...");
-                pathCache[path] = fn(req, res, *a, **ka);
-            #else: print("Already cached!");
-            return pathCache[path];
-        return wrapper;
-    
-    def plugin_clearPathCacheOnPost (fn):
-        "Plugin for auto-clearing cache on every POST request.";
-        @functools.wraps(fn)
-        def wrapper (req, res, *a, **ka):
-            if req.getVerb() == "POST":
-                pathCache.clear();
-                #print("Cache cleared.");
-            return fn(req, res, *a, **ka);
-        return wrapper;
-    app.install(plugin_clearPathCacheOnPost);
-
     ########################################################
     # Serving Content: #####################################
     ########################################################
 
     @app.route("GET", "/")
-    @pathCacheful
     @dbful
     def get_homepage (req, res, db):
         pageList = pageModel.getAllPages_exclDrafts(db, blogId);
@@ -659,7 +625,6 @@ def buildApp (
     #    return "";
 
     @app.route("GET", "/sitemap.txt")
-    @pathCacheful
     @dbful
     def get_sitemapTxt (req, res, db):
         pageList = pageModel.getAllPages_exclDrafts(db, blogId);
@@ -673,7 +638,6 @@ def buildApp (
         return "\n".join([rootUrl] + pageUrlList);
     
     @app.route("GET", "/*")
-    @pathCacheful
     @dbful
     def get_pageBySlug (req, res, db):
         slug = req.wildcards[0];
