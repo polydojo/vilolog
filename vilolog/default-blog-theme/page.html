@@ -9,7 +9,13 @@
 </head>
 <body>
     {{= data.renderTpl("blog-header.html", data=data) =}}
-    {{= "<h1 class='red'>[PREVIEW]</h1>" if data.isPreview else "" =}}
+    @= if data.isPreview:
+    @{
+            <h1 class="red inlineBlock">[{{: 'Saved' if data.get("isPreviewSaved") else 'Unsaved' :}} Preview]</h1>
+            <sup><button class="pure-button" onclick="window.close();">&times; Close</button></sup>
+    @}
+    
+    <p class="small monaco">{{: data.currentPage.meta.isoDate :}}</p>
     
     <div class="main">{{= markdown.markdown(data.currentPage.body, extensions=['fenced_code']) =}}</div>
     <br>

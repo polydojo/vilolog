@@ -1,6 +1,6 @@
 @= import json, dotsi, pprint;
 @= page = data.page if (data and data.get("page")) else {};
-@= defaultMetaDict = {"title":"Sample Page", "slug":"sample-page", "isoDate":"2020-10-31", "template":"page.html", "isDraft":False};
+@= defaultMetaDict = {"title":"Sample Page", "slug":"sample-page", "isoDate":"2020-10-31", "template":"page.html", "isDraft":True};
 @= defaultMetaJStr = json.dumps(defaultMetaDict, indent=4);
 
 <!doctype html>
@@ -24,14 +24,21 @@
         </p>
         <p>
             <input type="hidden" name="xCsrfToken" value="">
-            <button class="pure-button pure-button-primary">Save</button>
-            &nbsp;<span onclick="openPreview()" class="pure-button small">Preview</span>
+            <button class="pure-button pure-button-primary">Save &amp; Exit</button>
+            @= if page:
+            @{
+                &nbsp;<span onclick="openPreview('Yes')" class="pure-button">Save &amp; View <sup>&#10138;</sup></span>
+            @}
+            &nbsp;<span onclick="openPreview('No')" class="pure-button">
+                Preview {{: 'Only' if page else '' :}} <sup>&#10138;</sup>
+            </span>
         </p>
     </form>
     <form id="previewForm" method="POST" action="/_previewPage/{{: page.get("_id") or "" :}}"  class="hidden" target="_blank">
         <textarea name="meta"></textarea><br><br>
         <textarea name="body"></textarea><br><br>
         <input name="xCsrfToken"><br><br>
+        <input name="saveYesNo" value="No"><br><br>
         <button>Submit</button>
     </form>
     
@@ -75,12 +82,29 @@
         pageForm.onsubmit = submitHandler;  // Alias.
         
         var previewForm = document.getElementById("previewForm");
-        var openPreview = function () {
+        var openPreview = function (saveYesNo) {
+            saveYesNo = saveYesNo || 'No';
             if (! submitHandler()) { return null; } // Short ckt.
             previewForm.meta.value = pageForm.meta.value;
             previewForm.body.value = pageForm.body.value;
             previewForm.xCsrfToken.value = pageForm.xCsrfToken.value;
+            previewForm.saveYesNo.value = saveYesNo;
             previewForm.submit();
+        };
+        
+        var bodyArea = document.querySelector('textarea[name="body"]');
+        bodyArea.onkeydown = function (event) {
+            if (event.key == "Tab" || event.which === 9) {
+                event.preventDefault();
+                var index = bodyArea.selectionEnd;
+                var len = bodyArea.value.length;
+                bodyArea.value = (
+                    bodyArea.value.slice(0, index) +
+                    "    " +    // 4-spaces
+                    bodyArea.value.slice(index, len) //+
+                );
+                bodyArea.setSelectionRange(index + 4, index + 4);
+            }
         };
     </script>
     

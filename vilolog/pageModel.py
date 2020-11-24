@@ -89,11 +89,11 @@ def adaptPage (db, page):
     assert page.version == PAGE_VERSION;
     return page;
 
-def getPage (db, subdoc, blogId):
+def getPage (db, subdoc, blogId, whereEtc="", argsEtc=None):
     if type(subdoc) is str:
         subdoc = {"_id": subdoc};
     subdoc.update({"type": "page", "blogId": blogId});
-    page = db.findOne(subdoc);
+    page = db.findOne(subdoc, whereEtc=whereEtc, argsEtc=argsEtc);
     if not page: return None;
     return adaptPage(db, page);
 
@@ -101,35 +101,42 @@ def getPageBySlug (db, slug, blogId):
     subdoc = {"meta": {"slug": slug}};
     return getPage(db, subdoc, blogId);
 
-def getNextAndPrevPages (db, page, blogId):
-    subdoc = {
-        "type": "page", "blogId": blogId,
+def getLatestPage_exclDrafts (db, blogId):
+    subdoc = {"meta": {"isDraft": False}};
+    return getPage(db, subdoc, blogId, whereEtc="""
+        ORDER BY doc->'meta'->>'isoDate' DESC
+    """);
+
+def _getNextAndPrevPages (db, page, blogId, exclDrafts=True):
+    subdoc = dotsi.fy({
         "meta": {"template": page.meta.template},
-    };
-    nextPage = db.findOne(subdoc, whereEtc="""
+    });
+    if exclDrafts:
+        subdoc.meta.update({"isDraft": False});
+    nextPage = getPage(db, subdoc, blogId, whereEtc="""
         AND doc->'meta'->>'isoDate' > %s
         ORDER BY doc->'meta'->>'isoDate' ASC
     """, argsEtc=[page.meta.isoDate]);
-    prevPage = db.findOne(subdoc, whereEtc="""
+    prevPage = getPage(db, subdoc, blogId, whereEtc="""
         AND doc->'meta'->>'isoDate' < %s
         ORDER BY doc->'meta'->>'isoDate' DESC
     """, argsEtc=[page.meta.isoDate]);
-    if nextPage:
-        nextPage = adaptPage(db, nextPage);
-    if prevPage:
-        prevPage = adaptPage(db, prevPage);
     return [nextPage, prevPage];
 
-def getPageList (db, subdoc, blogId):
+def getNextAndPrevPages_inclDrafts (db, page, blogId):
+    return _getNextAndPrevPages(db, page, blogId, exclDrafts=False)
+
+def getNextAndPrevPages_exclDrafts (db, page, blogId):
+    return _getNextAndPrevPages(db, page, blogId, exclDrafts=True)
+    
+
+def getPageList (db, subdoc, blogId, whereEtc="", argsEtc=None):
     subdoc.update({"type": "page", "blogId": blogId});
-    ## Either:
-    #pageList = db.find(subdoc);
-    #pageList = utils.mapli(pageList, lambda p: adaptPage(db, p));
-    #pageList.sort(key=lambda p: p.meta.isoDate, reverse=True);
-    ## OR:
-    pageList = db.find(subdoc, whereEtc="""
-        ORDER BY doc->'meta'->>'isoDate' DESC
-    """);
+    if whereEtc == "" and argsEtc is None:
+        whereEtc = """
+            ORDER BY doc->'meta'->>'isoDate' DESC
+        """; # ^^^ default order
+    pageList = db.find(subdoc, whereEtc=whereEtc, argsEtc=argsEtc);
     pageList = utils.mapli(pageList, lambda p: adaptPage(db, p));
     # Finally:
     return pageList;

@@ -25,7 +25,9 @@ code { background-color: lightgray; }
 .gray { color: gray; }
 .pull-right { float: right; }
 .inlineBlock { display: inline-block; }
-.center { text-align: center; }
+.inline { display: inline; }
+.center, .centerText { text-align: center; }
+.rightText { text-align: right; }
 .monaco, pre, code, input, textarea { font-family: monaco, Consolas, "Lucida Console", monospace; }
 .marginless { margin: 0; }
 .white { color: white; }

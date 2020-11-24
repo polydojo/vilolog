@@ -16,7 +16,7 @@ psycopg2-binary==2.8.6
 pycparser==2.20
 python-dateutil==2.8.1
 pytoml==0.1.21
-qree==0.0.2
+qree==0.0.4
 requests==2.24.0
 six==1.15.0
 urllib3==1.25.11

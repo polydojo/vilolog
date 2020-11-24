@@ -45,7 +45,7 @@ from . import utils;
 from . import pageModel;
 from . import userModel;
 
-__version__ = "0.0.6";  # Req'd by flit.
+__version__ = "0.0.7";  # Req'd by flit.
 
 PKG_DIR = os.path.dirname(os.path.realpath(__file__));
 DEFAULT_ADMIN_THEME_DIR = os.path.join(PKG_DIR, "default-admin-theme");
@@ -492,20 +492,25 @@ def buildApp (
             meta = dotsi.fy(json.loads(f.meta));
             currentPage = (
                 pageModel.getPage(db, pageId, blogId) if pageId else
-                pageModel.buildPage(meta, req.fdata.body, user, blogId)
+                pageModel.buildPage(meta, f.body, user, blogId)
             );
-            currentPage.update({"meta": meta, "body": req.fdata.body});
+            currentPage.update({"meta": meta, "body": f.body});
+            if f.saveYesNo == "Yes":    # str, not bool.
+                pageModel.replacePage(db, currentPage, blogId);
+                if not currentPage.meta.isDraft:
+                    return res.redirect("/" + currentPage.meta.slug);
         else:
             currentPage = pageModel.getPage(db, pageId, blogId);
         # Eitherway ...
         assert currentPage;
-        nextPage, prevPage = pageModel.getNextAndPrevPages(
+        nextPage, prevPage = pageModel.getNextAndPrevPages_inclDrafts(
             db, currentPage, blogId,
         );
         return blogTpl(currentPage.meta.template, data={
                 "currentPage": currentPage,
                 "title": currentPage.meta.title + " // " + blogTitle,
                 "isPreview": True,
+                "isPreviewSaved": (verb == "GET" or f.saveYesNo == "Yes"),
                 "nextPage": nextPage,
                 "prevPage": prevPage,
                 "req": req, "res": res,
@@ -618,6 +623,14 @@ def buildApp (
             "req": req, "res": res,
         });
     
+    @app.route("GET", "/_latest")   # Admin-shortcut to latest page.
+    @dbful
+    def get_latest_page (req, res, db):
+        page = pageModel.getLatestPage_exclDrafts(db, blogId);
+        if not page:
+            return res.redirect("/");
+        return res.redirect("/" + page.meta.slug);
+    
     #TODO/Consider:
     #@app.route("GET", "/robots.txt")
     #def get_robotsTxt (req, res):
@@ -646,13 +659,14 @@ def buildApp (
             raise vilo.error(blogTpl("404.html", data={
                 "req": req, "res": res,
             }));
-        nextPage, prevPage = pageModel.getNextAndPrevPages(
+        nextPage, prevPage = pageModel.getNextAndPrevPages_exclDrafts(
             db, currentPage, blogId,
         );
         return blogTpl(currentPage.meta.template, data={
                 "currentPage": currentPage,
                 "title": currentPage.meta.title + " // " + blogTitle,
                 "isPreview": False,
+                "isPreviewSaved": None, # Not applicable
                 "nextPage": nextPage,
                 "prevPage": prevPage,
                 "req": req, "res": res,
